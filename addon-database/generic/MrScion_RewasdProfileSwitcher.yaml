@@ -3,8 +3,8 @@ Type: Generic
 Name: reWASD Profile Switcher
 Author: Mr. Scion
 ShortDescription: Automatically switches your reWASD gamepad profile(s) when a game starts and stops, with per-library overrides.
-InstallerManifestUrl: https://raw.githubusercontent.com/MrScion/playnite-reswad-extension/master/addon-database/installer.yaml
-SourceUrl: https://github.com/MrScion/playnite-reswad-extension
+InstallerManifestUrl: https://raw.githubusercontent.com/MrScion/reswad-playnite-ext/master/addon-database/installer.yaml
+SourceUrl: https://github.com/MrScion/reswad-playnite-ext
 Description: >
   Switches the active reWASD gamepad profile(s) automatically when any game
   starts or stops, by driving reWASDCommandLine.exe. Supports multiple
@@ -28,5 +28,5 @@ Description: >
   hand). Off by default - irrelevant if you play with keyboard/mouse.
 Tags: ['reWASD', 'Gamepad', 'Controller']
 Links:
-  GitHub: https://github.com/MrScion/playnite-reswad-extension
+  GitHub: https://github.com/MrScion/reswad-playnite-ext
   reWASD: https://www.rewasd.com

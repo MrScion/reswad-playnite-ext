@@ -3,7 +3,7 @@ Packages:
   - Version: 0.1.8
     RequiredApiVersion: 6.16.0
     ReleaseDate: 2026-11-21
-    PackageUrl: https://github.com/MrScion/playnite-reswad-extension/releases/download/v0.1.8/ReWasdProfileSwitcher_0.1.8.pext
+    PackageUrl: https://github.com/MrScion/reswad-playnite-ext/releases/download/v0.1.8/ReWasdProfileSwitcher_0.1.8.pext
     Changelog:
       - The default profile is now applied when Playnite starts (with retries while reWASD's engine starts up).
       - Fixed the profile sometimes not being applied on game start/stop - a failed "remap on" no longer aborts applying the profile.
@@ -12,7 +12,7 @@ Packages:
   - Version: 0.1.7
     RequiredApiVersion: 6.16.0
     ReleaseDate: 2026-09-09
-    PackageUrl: https://github.com/MrScion/playnite-reswad-extension/releases/download/v0.1.7/ReWasdProfileSwitcher_0.1.7.pext
+    PackageUrl: https://github.com/MrScion/reswad-playnite-ext/releases/download/v0.1.7/ReWasdProfileSwitcher_0.1.7.pext
     Changelog:
       - Added a reWASD installation folder setting (General tab) that auto-detects reWASDCommandLine.exe.
       - Added a reWASD profiles folder setting (General tab) that offers a picker of found .rewasd files when choosing a default or per-library profile, instead of browsing the file system by hand.
