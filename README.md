@@ -55,6 +55,13 @@ for why), this extension is a single `GenericPlugin`, so it ships as one
 - **On game stop**: for each configured device, applies its default
   profile (back to "desktop") — turning remap back on first, in case the
   game that just closed belonged to a Passthrough library.
+- **On Playnite start**: applies each device's default profile in the
+  background, retrying for up to ~30 s (Playnite can start before reWASD's
+  engine is ready right after Windows logon).
+- Every profile switch is retried a few times if reWASD's CLI fails, and a
+  failed `remap on` no longer prevents the profile from being applied.
+  Successes and failed attempts are written to Playnite's
+  `extensions.log` for troubleshooting.
 - Libraries are picked from ones already represented in your Playnite game
   database (grouped by `Game.PluginId`, labeled by `Game.Source.Name`) —
   there's no other way to enumerate installed library plugins from a

@@ -1,5 +1,14 @@
 AddonId: a56345f8-1e5b-4876-8ecc-2a103fa1117a
 Packages:
+  - Version: 0.1.8
+    RequiredApiVersion: 6.16.0
+    ReleaseDate: 2026-11-21
+    PackageUrl: https://github.com/MrScion/playnite-reswad-extension/releases/download/v0.1.8/ReWasdProfileSwitcher_0.1.8.pext
+    Changelog:
+      - The default profile is now applied when Playnite starts (with retries while reWASD's engine starts up).
+      - Fixed the profile sometimes not being applied on game start/stop - a failed "remap on" no longer aborts applying the profile.
+      - Profile switches are retried on failure and logged to extensions.log.
+      - reWASD CLI output is read asynchronously to avoid spurious timeouts.
   - Version: 0.1.7
     RequiredApiVersion: 6.16.0
     ReleaseDate: 2026-09-09

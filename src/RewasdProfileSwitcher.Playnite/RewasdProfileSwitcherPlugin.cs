@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Controls;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -38,6 +40,31 @@ namespace RewasdProfileSwitcher.Playnite
             return new RewasdSettingsView();
         }
 
+        /// <summary>
+        /// Playnite just launched: apply every device's default profile, so
+        /// reWASD isn't left running with no profile until the first game
+        /// closes. Runs on a background thread with generous retries — at
+        /// Windows logon Playnite often starts before reWASD's service/engine
+        /// is ready to accept CLI commands.
+        /// </summary>
+        public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
+        {
+            var settings = LoadPluginSettings<RewasdSettings>() ?? new RewasdSettings();
+            if (!settings.IntegrationEnabled)
+            {
+                return;
+            }
+
+            Task.Run(() =>
+            {
+                foreach (var device in settings.Devices)
+                {
+                    ApplyToDevice(settings.CliPath, device, device.DefaultProfilePath, device.DefaultProfileSlot,
+                        passthrough: false, context: "Playnite startup", attempts: StartupAttempts, delayMs: StartupRetryDelayMs);
+                }
+            });
+        }
+
         public override void OnGameStarting(OnGameStartingEventArgs args)
         {
             var settings = LoadPluginSettings<RewasdSettings>() ?? new RewasdSettings();
@@ -51,22 +78,8 @@ namespace RewasdProfileSwitcher.Playnite
                 var profile = RewasdProfileResolver.ResolveStartProfile(
                     args.Game.PluginId, device.DefaultProfilePath, device.DefaultProfileSlot, device.LibraryProfiles);
 
-                try
-                {
-                    if (profile.IsPassthrough)
-                    {
-                        RewasdCliController.SetRemapState(settings.CliPath, device.DeviceId, false);
-                    }
-                    else
-                    {
-                        RewasdCliController.SetRemapState(settings.CliPath, device.DeviceId, true);
-                        RewasdCliController.ApplyProfile(settings.CliPath, device.DeviceId, profile.ProfilePath, profile.ProfileSlot);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn(ex, $"Failed to apply reWASD profile for device '{device.DisplayName}' when starting '{args.Game.Name}'.");
-                }
+                ApplyToDevice(settings.CliPath, device, profile.ProfilePath, profile.ProfileSlot,
+                    profile.IsPassthrough, $"starting '{args.Game.Name}'", GameAttempts, GameRetryDelayMs);
             }
         }
 
@@ -80,16 +93,64 @@ namespace RewasdProfileSwitcher.Playnite
 
             foreach (var device in settings.Devices)
             {
+                ApplyToDevice(settings.CliPath, device, device.DefaultProfilePath, device.DefaultProfileSlot,
+                    passthrough: false, context: $"stopping '{args.Game.Name}'", attempts: GameAttempts, delayMs: GameRetryDelayMs);
+            }
+        }
+
+        private const int GameAttempts = 3;
+        private const int GameRetryDelayMs = 1000;
+        private const int StartupAttempts = 10;
+        private const int StartupRetryDelayMs = 3000;
+
+        /// <summary>
+        /// Puts one device in the requested state, retrying transient CLI
+        /// failures (reWASD engine busy/not ready yet). For a real profile,
+        /// "remap on" is best-effort: if it fails (e.g. remap was already on,
+        /// or the device had no profile loaded yet) the "apply" still runs —
+        /// previously a failing "remap on" aborted the whole switch and left
+        /// the device without its profile. Never throws; logs every outcome
+        /// so extensions.log shows what actually happened.
+        /// </summary>
+        private static void ApplyToDevice(string cliPath, RewasdDeviceSettings device, string profilePath, string profileSlot,
+            bool passthrough, string context, int attempts, int delayMs)
+        {
+            for (var attempt = 1; attempt <= attempts; attempt++)
+            {
                 try
                 {
-                    // Always re-enable remap first — the game that just closed may have
-                    // been a passthrough library, which left remap off for this device.
-                    RewasdCliController.SetRemapState(settings.CliPath, device.DeviceId, true);
-                    RewasdCliController.ApplyProfile(settings.CliPath, device.DeviceId, device.DefaultProfilePath, device.DefaultProfileSlot);
+                    if (passthrough)
+                    {
+                        RewasdCliController.SetRemapState(cliPath, device.DeviceId, false);
+                        Logger.Info($"reWASD: remap off (passthrough) for '{device.DisplayName}' when {context}.");
+                    }
+                    else
+                    {
+                        try
+                        {
+                            RewasdCliController.SetRemapState(cliPath, device.DeviceId, true);
+                        }
+                        catch (Exception remapEx)
+                        {
+                            Logger.Warn($"reWASD: 'remap on' failed for '{device.DisplayName}' when {context} (continuing with apply): {remapEx.Message}");
+                        }
+
+                        RewasdCliController.ApplyProfile(cliPath, device.DeviceId, profilePath, profileSlot);
+                        Logger.Info($"reWASD: applied '{profilePath}' ({profileSlot}) to '{device.DisplayName}' when {context}.");
+                    }
+
+                    return;
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn(ex, $"Failed to apply reWASD default profile for device '{device.DisplayName}' when stopping '{args.Game.Name}'.");
+                    if (attempt >= attempts)
+                    {
+                        Logger.Warn(ex, $"reWASD: giving up on '{device.DisplayName}' when {context} after {attempts} attempts.");
+                        return;
+                    }
+
+                    Logger.Warn($"reWASD: attempt {attempt}/{attempts} failed for '{device.DisplayName}' when {context}: {ex.Message}");
+                    Thread.Sleep(delayMs);
                 }
             }
         }
@@ -104,7 +165,15 @@ namespace RewasdProfileSwitcher.Playnite
         {
             try
             {
-                RewasdCliController.SetRemapState(cliPath, deviceId, true);
+                try
+                {
+                    RewasdCliController.SetRemapState(cliPath, deviceId, true);
+                }
+                catch (Exception remapEx)
+                {
+                    Logger.Warn($"reWASD test: 'remap on' failed (continuing with apply): {remapEx.Message}");
+                }
+
                 RewasdCliController.ApplyProfile(cliPath, deviceId, profilePath, profileSlot);
                 PlayniteApi.Dialogs.ShowMessage(ResourceProvider.GetString("LOCRewasdTestOk"), "reWASD Profile Switcher");
             }

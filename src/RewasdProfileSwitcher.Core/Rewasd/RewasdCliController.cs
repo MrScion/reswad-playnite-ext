@@ -73,6 +73,7 @@ namespace RewasdProfileSwitcher.Core.Rewasd
                 Arguments = arguments,
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
 
@@ -83,17 +84,24 @@ namespace RewasdProfileSwitcher.Core.Rewasd
                     throw new InvalidOperationException("Could not start reWASDCommandLine.exe.");
                 }
 
+                // Read both streams asynchronously while waiting: reading them only
+                // after WaitForExit can deadlock if the child fills a pipe buffer
+                // (the child blocks writing, we block waiting -> spurious timeout).
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                var stderrTask = process.StandardError.ReadToEndAsync();
+
                 if (!process.WaitForExit(ProcessTimeoutMs))
                 {
-                    throw new TimeoutException("reWASDCommandLine.exe did not respond in time.");
+                    try { process.Kill(); } catch { /* already gone */ }
+                    throw new TimeoutException($"reWASDCommandLine.exe did not respond in time ({arguments}).");
                 }
 
                 if (process.ExitCode != 0)
                 {
-                    var stderr = process.StandardError.ReadToEnd();
-                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(stderr)
-                        ? $"reWASDCommandLine.exe returned exit code {process.ExitCode}."
-                        : $"reWASDCommandLine.exe returned exit code {process.ExitCode}: {stderr.Trim()}");
+                    var output = (stderrTask.Result + " " + stdoutTask.Result).Trim();
+                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(output)
+                        ? $"reWASDCommandLine.exe returned exit code {process.ExitCode} ({arguments})."
+                        : $"reWASDCommandLine.exe returned exit code {process.ExitCode} ({arguments}): {output}");
                 }
             }
         }
